@@ -2,11 +2,11 @@ package lotus
 
 import (
 	"context"
+	"fmt"
 	"github.com/filecoin-project/go-jsonrpc"
 	lotusapi "github.com/filecoin-project/lotus/api"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -14,7 +14,7 @@ import (
 type DaemonInfo struct {
 	Network string
 	Version string
-	Value   uint64
+	Value   int64
 }
 
 func GetMinerID(minerApiInfo string) (id string, err error) {
@@ -54,28 +54,35 @@ func GetInfo(fullNodeApiInfo string) (daemonInfo DaemonInfo, err error) {
 	defer closer()
 
 	// get daemon_network.
-	daemonNetwork, err := api.Version(context.Background())
+	daemonNetwork, err := api.StateNetworkName(context.Background())
 	if err != nil {
 		log.Fatalf("calling daemonNetwork: %s", err)
 	}
 
-	// get daemon_network_version.
-	daemonNetworkVersion, err := api.Version(context.Background())
-	if err != nil {
-		log.Fatalf("calling daemonNetworkVersion: %s", err)
+	// Now you can call any API you're interested in.
+	tipset, err01 := api.ChainHead(context.Background())
+	if err01 != nil {
+		log.Fatalf("calling chain head: %s", err01)
 	}
+	fmt.Printf("Current chain head is: %s\n", tipset.String())
 
 	// get daemon_network_version.
+	// get networker_version
+	daemonNetworkVersion, err01 := api.StateNetworkVersion(context.Background(), tipset.Key())
+	if err01 != nil {
+		log.Fatalf("calling networker version: %s", err01)
+	}
+
+	// get daemon_version.
 	daemonVersion, err := api.Version(context.Background())
 	if err != nil {
 		log.Fatalf("calling daemonVersion: %s", err)
 	}
-	daemonVersionNum, _ := strconv.Atoi(daemonVersion.Version)
 
 	daemonInfo = DaemonInfo{
-		Network: daemonNetwork.String(),
-		Version: daemonNetworkVersion.String(),
-		Value:   uint64(daemonVersionNum),
+		Network: string(daemonNetwork),
+		Version: daemonVersion.String(),
+		Value:   int64(daemonNetworkVersion),
 	}
 	return daemonInfo, nil
 }
