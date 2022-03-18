@@ -1,0 +1,15 @@
+[Unit]
+Description=lotus exporter
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+WorkingDirectory=/usr/local/bin
+EnvironmentFile=/etc/sysconfig/lotus_exporter
+ExecStart=/usr/local/bin/lotus_exporter
+
+[Install]
+WantedBy=multi-user.target
