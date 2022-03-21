@@ -1,11 +1,16 @@
 package exporter
 
 import (
+	"context"
+	"github.com/filecoin-project/go-jsonrpc"
+	lotusapi "github.com/filecoin-project/lotus/api"
+	"github.com/spark8899/lotus_exporter/lotusinfo"
 	"log"
+	"net/http"
+	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/version"
-	"github.com/spark8899/lotus_exporter/lotus"
 )
 
 const (
@@ -60,20 +65,49 @@ func (collector *lotusCollector) Collect(ch chan<- prometheus.Metric) {
 
 	fullNodeApiInfo := collector.ltOptions.FullNodeApiInfo
 	minerApiInfo := collector.ltOptions.MinerApiInfo
+	ctx := context.Background()
 
-	minerId, err := lotus.GetMinerID(minerApiInfo)
+	// get fullApi
+	fullNodeApiInfoS := lotusinfo.ParseApiInfo(strings.TrimSpace(fullNodeApiInfo))
+	fullNodeApiHeaders := http.Header{"Authorization": []string{"Bearer " + string(fullNodeApiInfoS.Token)}}
+	var fuApi lotusapi.FullNodeStruct
+	closer01, err01 := jsonrpc.NewMergeClient(ctx, fullNodeApiInfoS.Addr, "Filecoin", []interface{}{&fuApi.Internal, &fuApi.CommonStruct.Internal}, fullNodeApiHeaders)
+	if err01 != nil {
+		log.Fatalf("connecting with lotus failed: %s", err01)
+	}
+	defer closer01()
+
+	// get minerApi
+	minerApiInfoS := lotusinfo.ParseApiInfo(strings.TrimSpace(minerApiInfo))
+	minerApiHeaders := http.Header{"Authorization": []string{"Bearer " + string(minerApiInfoS.Token)}}
+	var miApi lotusapi.StorageMinerStruct
+	closer02, err02 := jsonrpc.NewMergeClient(context.Background(), minerApiInfoS.Addr, "Filecoin", []interface{}{&miApi.Internal, &miApi.CommonStruct.Internal}, minerApiHeaders)
+	if err02 != nil {
+		log.Fatalf("connecting with lotus-miner failed: %s", err02)
+	}
+	defer closer02()
+
+	// get minerId
+	minerId, err := lotusinfo.GetMinerID(ctx, miApi)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fullNodeInfo, err := lotus.GetInfo(fullNodeApiInfo)
+	// get chainHead
+	chainHead, err := lotusinfo.GetChainHead(ctx, fuApi)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// get lotusInfo
+	fullNodeInfo, err := lotusinfo.GetInfo(ctx, fuApi, chainHead)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	//Write latest value for each metric in the prometheus metric channel.
 	//Note that you can pass CounterValue, GaugeValue, or UntypedValue types here.
-	ch <- prometheus.MustNewConstMetric(collector.lotusLocalTime, prometheus.GaugeValue, float64(lotus.GetLocalTime()))
+	ch <- prometheus.MustNewConstMetric(collector.lotusLocalTime, prometheus.GaugeValue, float64(lotusinfo.GetLocalTime()))
 	ch <- prometheus.MustNewConstMetric(collector.lotusInfo, prometheus.GaugeValue, float64(fullNodeInfo.Value), minerId, fullNodeInfo.Network, fullNodeInfo.Version)
 }
 

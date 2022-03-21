@@ -1,4 +1,4 @@
-package lotus
+package lotusinfo
 
 import (
 	"github.com/multiformats/go-multiaddr"
@@ -13,9 +13,9 @@ var (
 	infoWithToken = regexp.MustCompile("^[a-zA-Z0-9\\-_]+?\\.[a-zA-Z0-9\\-_]+?\\.([a-zA-Z0-9\\-_]+)?:.+$")
 )
 
-type apiConnInfo struct {
-	addr  string
-	token []byte
+type ApiConnInfo struct {
+	Addr  string
+	Token []byte
 }
 
 func dialArgs(addr, version string) (string, error) {
@@ -36,7 +36,7 @@ func dialArgs(addr, version string) (string, error) {
 	return addr + "/rpc/" + version, nil
 }
 
-func parseApiInfo(s string) apiConnInfo {
+func ParseApiInfo(s string) ApiConnInfo {
 	var tok []byte
 	if infoWithToken.Match([]byte(s)) {
 		sp := strings.SplitN(s, ":", 2)
@@ -46,14 +46,14 @@ func parseApiInfo(s string) apiConnInfo {
 
 	addr, err := dialArgs(s, "v0")
 	if err != nil {
-		return apiConnInfo{
-			addr:  s,
-			token: tok,
+		return ApiConnInfo{
+			Addr:  s,
+			Token: tok,
 		}
 	}
 
-	return apiConnInfo{
-		addr:  addr,
-		token: tok,
+	return ApiConnInfo{
+		Addr:  addr,
+		Token: tok,
 	}
 }
