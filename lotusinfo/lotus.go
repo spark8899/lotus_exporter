@@ -5,6 +5,7 @@ import (
 	lotusapi "github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/chain/types"
 	"log"
+	"strconv"
 	"time"
 )
 
@@ -69,7 +70,12 @@ func GetchainBasefee(chainHead *types.TipSet) int64 {
 	return chainHead.Blocks()[0].ParentBaseFee.Int64()
 }
 
-//func GetchainHeight(chainHead *types.TipSet) int64 {
-//	height := chainHead.Height().String()
-//	return chainHead.Height()
-//}
+func GetchainHeight(chainHead *types.TipSet) int64 {
+	heightStr := chainHead.Height().String()
+	height, err := strconv.ParseInt(heightStr, 10, 64)
+	if err != nil {
+		log.Fatalf("get chainHeight err: %s", err)
+		return 0
+	}
+	return height
+}

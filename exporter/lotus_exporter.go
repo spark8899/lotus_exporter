@@ -25,8 +25,10 @@ type LotusOpt struct {
 
 // setting collector
 type lotusCollector struct {
-	lotusInfo      *prometheus.Desc
-	lotusLocalTime *prometheus.Desc
+	lotusInfo         *prometheus.Desc
+	lotusLocalTime    *prometheus.Desc
+	lotusChainBasefee *prometheus.Desc
+	lotusChainHeight  *prometheus.Desc
 
 	ltOptions LotusOpt
 }
@@ -42,6 +44,14 @@ func newLotusCollector(opts *LotusOpt) *lotusCollector {
 		lotusInfo: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "info"),
 			"lotus daemon information like address version, value is set to network version number",
 			[]string{"miner_id", "version", "network"}, nil,
+		),
+		lotusChainHeight: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "chain_height"),
+			"return current height",
+			[]string{"miner_id"}, nil,
+		),
+		lotusChainBasefee: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "chain_basefee"),
+			"return current basefee",
+			[]string{"miner_id"}, nil,
 		),
 
 		ltOptions: *opts,
@@ -105,10 +115,18 @@ func (collector *lotusCollector) Collect(ch chan<- prometheus.Metric) {
 		log.Fatal(err)
 	}
 
+	// get chain height
+	chainHeight := lotusinfo.GetchainHeight(chainHead)
+
+	// get chain basefee
+	basefee := lotusinfo.GetchainBasefee(chainHead)
+
 	//Write latest value for each metric in the prometheus metric channel.
 	//Note that you can pass CounterValue, GaugeValue, or UntypedValue types here.
 	ch <- prometheus.MustNewConstMetric(collector.lotusLocalTime, prometheus.GaugeValue, float64(lotusinfo.GetLocalTime()))
 	ch <- prometheus.MustNewConstMetric(collector.lotusInfo, prometheus.GaugeValue, float64(fullNodeInfo.Value), minerId, fullNodeInfo.Network, fullNodeInfo.Version)
+	ch <- prometheus.MustNewConstMetric(collector.lotusChainHeight, prometheus.GaugeValue, float64(chainHeight), minerId)
+	ch <- prometheus.MustNewConstMetric(collector.lotusChainBasefee, prometheus.GaugeValue, float64(basefee), minerId)
 }
 
 // Register registers the volume metrics
