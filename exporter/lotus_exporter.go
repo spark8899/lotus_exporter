@@ -142,8 +142,8 @@ func (collector *lotusCollector) Collect(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(collector.lotusChainBasefee, prometheus.GaugeValue, float64(basefee), minerId)
 
 	for _, i := range chainSyncStats {
-		ch <- prometheus.MustNewConstMetric(collector.lotusChainSyncDiff, prometheus.GaugeValue, float64(i.CSDiff), i.CSWorkerID)
-		ch <- prometheus.MustNewConstMetric(collector.lotusChainSyncStatus, prometheus.GaugeValue, float64(i.CSStatus), i.CSWorkerID)
+		ch <- prometheus.MustNewConstMetric(collector.lotusChainSyncDiff, prometheus.GaugeValue, float64(i.CSDiff), minerId, i.CSWorkerID)
+		ch <- prometheus.MustNewConstMetric(collector.lotusChainSyncStatus, prometheus.GaugeValue, float64(i.CSStatus), minerId, i.CSWorkerID)
 	}
 }
 
