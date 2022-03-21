@@ -3,45 +3,33 @@ monitor lotus daemon and miner
 
 To run it:
 
-    go build
+    go build -v -ldflags "-X main.version=`cat VERSION` -X main.branch=`git rev-parse --abbrev-ref HEAD` -X main.revision=`git rev-parse --short HEAD`"
     ./lotus_exporter [flags]
 
 ## Exported Metrics
-| Metric | Description | Labels |
-| ------ | ------- | ------ |
-| mirth_up | Was the last Mirth CLI query successful | |
-| mirth_messages_received_total | How many messages have been received | channel |
-| mirth_messages_filtered_total  | How many messages have been filtered | channel |
-| mirth_messages_queued | How many messages are currently queued | channel |
-| mirth_messages_sent_total  | How many messages have been sent | channel |
-| mirth_messages_errored_total  | How many messages have errored | channel |
+| Metric                       | Description                                      | Labels  |
+|------------------------------|--------------------------------------------------|---------|
+| up                           | Was the last lotus_exporter CLI query successful |         |
+| lotus_chain_basefee          | return current basefee                           | lotus   |
+| lotus_chain_height           | return current height                            | lotus   |
+| lotus_local_time             | time on the node machine when last execution start in epoch         | lotus   |
+| lotus_info                   |  lotus daemon information like address version, value is set to network version number              | lotus   |
 
 ## Flags
     ./lotus_exporter --help
 
-| Flag | Description | Default |
-| ---- | ----------- | ------- |
-| log.level | Logging level | `info` |
-| web.listen-address | Address to listen on for telemetry | `:9141` |
-| web.telemetry-path | Path under which to expose metrics | `/metrics` |
-| config.file-path | Optional environment file path | `None` |
+| Flag                | Description | Default |
+|---------------------| ----------- | ------- |
+| -config-path        | Path to environment file | `/etc/lotus_exporter/.env` |
+| -web.listen-address | Address to listen on for telemetry | `:9141` |
+| -web.telemetry-path | Path under which to expose metrics | `/metrics` |
 
 ## Env Variables
 
 Use a .env file in the local folder, /etc/lotus_exporter/.env, or
-use the --config.file-path command line flag to provide a path to your
+use the -config.file-path command line flag to provide a path to your
 environment file
 ```
 MINER_API_INFO=xxxx-xxx-xx:/ip4/xxx.xx.xx.xx/tcp/2345/http
 FULLNODE_API_INFO=xxxx-xxx-xx:/ip4/xxx.xx.xx.xx/tcp/1234/http
 ```
-
-## Notice
-
-This exporter is inspired by the [consul_exporter](https://github.com/prometheus/consul_exporter)
-and has some common code. Any new code here is Copyright &copy; 2020 TeamZero, Inc. See the included
-LICENSE file for terms and conditions.
-
-## 引用
-* https://github.com/teamzerolabs/mirth_channel_exporter
-* https://github.com/mnadeem/volume_exporter

@@ -15,6 +15,12 @@ type DaemonInfo struct {
 	Value   int64
 }
 
+type ChainSyncState struct {
+	CSWorkerID string
+	CSDiff     int64
+	CSStatus   int
+}
+
 func GetMinerID(ctx context.Context, mi lotusapi.StorageMinerStruct) (id string, err error) {
 	address, err := mi.ActorAddress(ctx)
 	if err != nil {
@@ -66,11 +72,11 @@ func GetInfo(ctx context.Context, fu lotusapi.FullNodeStruct, chainHead *types.T
 	return daemonInfo, nil
 }
 
-func GetchainBasefee(chainHead *types.TipSet) int64 {
+func GetChainBasefee(chainHead *types.TipSet) int64 {
 	return chainHead.Blocks()[0].ParentBaseFee.Int64()
 }
 
-func GetchainHeight(chainHead *types.TipSet) int64 {
+func GetChainHeight(chainHead *types.TipSet) int64 {
 	heightStr := chainHead.Height().String()
 	height, err := strconv.ParseInt(heightStr, 10, 64)
 	if err != nil {
@@ -78,4 +84,25 @@ func GetchainHeight(chainHead *types.TipSet) int64 {
 		return 0
 	}
 	return height
+}
+
+func GetChainSyncState(ctx context.Context, fu lotusapi.FullNodeStruct) []ChainSyncState {
+	syncStat, err := fu.SyncState(ctx)
+	if err != nil {
+		// return err
+	}
+	var reSS []ChainSyncState
+
+	for i, ss := range syncStat.ActiveSyncs {
+		var heightDiff int64
+
+		if int64(ss.Target.Height()) >= int64(ss.Base.Height()) {
+			heightDiff = int64(ss.Target.Height()) - int64(ss.Base.Height())
+		} else {
+			heightDiff = -1
+		}
+		reSS = append(reSS, ChainSyncState{strconv.Itoa(i), heightDiff, int(ss.Stage)})
+	}
+
+	return reSS
 }

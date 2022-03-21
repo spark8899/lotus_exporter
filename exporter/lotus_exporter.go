@@ -25,10 +25,12 @@ type LotusOpt struct {
 
 // setting collector
 type lotusCollector struct {
-	lotusInfo         *prometheus.Desc
-	lotusLocalTime    *prometheus.Desc
-	lotusChainBasefee *prometheus.Desc
-	lotusChainHeight  *prometheus.Desc
+	lotusInfo            *prometheus.Desc
+	lotusLocalTime       *prometheus.Desc
+	lotusChainBasefee    *prometheus.Desc
+	lotusChainHeight     *prometheus.Desc
+	lotusChainSyncDiff   *prometheus.Desc
+	lotusChainSyncStatus *prometheus.Desc
 
 	ltOptions LotusOpt
 }
@@ -52,6 +54,14 @@ func newLotusCollector(opts *LotusOpt) *lotusCollector {
 		lotusChainBasefee: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "chain_basefee"),
 			"return current basefee",
 			[]string{"miner_id"}, nil,
+		),
+		lotusChainSyncDiff: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "chain_sync_diff"),
+			"return daemon sync height diff with chainhead for each daemon worker",
+			[]string{"miner_id", "worker_id"}, nil,
+		),
+		lotusChainSyncStatus: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "chain_sync_status"),
+			"return daemon sync status with chainhead for each daemon worker",
+			[]string{"miner_id", "worker_id"}, nil,
 		),
 
 		ltOptions: *opts,
@@ -115,11 +125,14 @@ func (collector *lotusCollector) Collect(ch chan<- prometheus.Metric) {
 		log.Fatal(err)
 	}
 
+	// get chain sync info
+	chainSyncStats := lotusinfo.GetChainSyncState(ctx, fuApi)
+
 	// get chain height
-	chainHeight := lotusinfo.GetchainHeight(chainHead)
+	chainHeight := lotusinfo.GetChainHeight(chainHead)
 
 	// get chain basefee
-	basefee := lotusinfo.GetchainBasefee(chainHead)
+	basefee := lotusinfo.GetChainBasefee(chainHead)
 
 	//Write latest value for each metric in the prometheus metric channel.
 	//Note that you can pass CounterValue, GaugeValue, or UntypedValue types here.
@@ -127,6 +140,11 @@ func (collector *lotusCollector) Collect(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(collector.lotusInfo, prometheus.GaugeValue, float64(fullNodeInfo.Value), minerId, fullNodeInfo.Network, fullNodeInfo.Version)
 	ch <- prometheus.MustNewConstMetric(collector.lotusChainHeight, prometheus.GaugeValue, float64(chainHeight), minerId)
 	ch <- prometheus.MustNewConstMetric(collector.lotusChainBasefee, prometheus.GaugeValue, float64(basefee), minerId)
+
+	for _, i := range chainSyncStats {
+		ch <- prometheus.MustNewConstMetric(collector.lotusChainSyncDiff, prometheus.GaugeValue, float64(i.CSDiff), i.CSWorkerID)
+		ch <- prometheus.MustNewConstMetric(collector.lotusChainSyncStatus, prometheus.GaugeValue, float64(i.CSStatus), i.CSWorkerID)
+	}
 }
 
 // Register registers the volume metrics
