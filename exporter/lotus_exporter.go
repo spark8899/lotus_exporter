@@ -25,12 +25,16 @@ type LotusOpt struct {
 
 // setting collector
 type lotusCollector struct {
-	lotusInfo            *prometheus.Desc
-	lotusLocalTime       *prometheus.Desc
-	lotusChainBasefee    *prometheus.Desc
-	lotusChainHeight     *prometheus.Desc
-	lotusChainSyncDiff   *prometheus.Desc
-	lotusChainSyncStatus *prometheus.Desc
+	lotusInfo             *prometheus.Desc
+	lotusLocalTime        *prometheus.Desc
+	lotusChainBasefee     *prometheus.Desc
+	lotusChainHeight      *prometheus.Desc
+	lotusChainSyncDiff    *prometheus.Desc
+	lotusChainSyncStatus  *prometheus.Desc
+	lotusPower            *prometheus.Desc
+	lotusPowerEligibility *prometheus.Desc
+	minerInfo             *prometheus.Desc
+	minerInfoSectorSize   *prometheus.Desc
 
 	ltOptions LotusOpt
 }
@@ -62,6 +66,22 @@ func newLotusCollector(opts *LotusOpt) *lotusCollector {
 		lotusChainSyncStatus: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "chain_sync_status"),
 			"return daemon sync status with chainhead for each daemon worker",
 			[]string{"miner_id", "worker_id"}, nil,
+		),
+		lotusPower: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "power"),
+			"return miner power",
+			[]string{"miner_id", "scope", "power_type"}, nil,
+		),
+		lotusPowerEligibility: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "power_mining_eligibility"),
+			"return miner mining eligibility",
+			[]string{"miner_id"}, nil,
+		),
+		minerInfo: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "miner_info"),
+			"lotus miner information like address version etc",
+			[]string{"miner_id", "version", "owner", "owner_addr", "worker", "worker_addr", "control0", "control0_addr"}, nil,
+		),
+		minerInfoSectorSize: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "miner_info_sector_size"),
+			"lotus miner sector size",
+			[]string{"miner_id"}, nil,
 		),
 
 		ltOptions: *opts,
@@ -114,13 +134,13 @@ func (collector *lotusCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 
 	// get chainHead
-	chainHead, err := lotusinfo.GetChainHead(ctx, fuApi)
+	chainTipSetKey, err := lotusinfo.GetTipsetKey(ctx, fuApi)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// get lotusInfo
-	fullNodeInfo, err := lotusinfo.GetInfo(ctx, fuApi, chainHead)
+	fullNodeInfo, err := lotusinfo.GetInfo(ctx, fuApi, chainTipSetKey)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -129,10 +149,28 @@ func (collector *lotusCollector) Collect(ch chan<- prometheus.Metric) {
 	chainSyncStats := lotusinfo.GetChainSyncState(ctx, fuApi)
 
 	// get chain height
-	chainHeight := lotusinfo.GetChainHeight(chainHead)
+	chainHeight := lotusinfo.GetChainHeight(chainTipSetKey)
 
 	// get chain basefee
-	basefee := lotusinfo.GetChainBasefee(chainHead)
+	basefee := lotusinfo.GetChainBasefee(chainTipSetKey)
+
+	// get miner power
+	mpRaw, mpQua, tpRaw, tpQua := lotusinfo.GetPowerList(ctx, fuApi, minerId, chainTipSetKey)
+
+	// get miner power eligibility
+	powerEligibility := lotusinfo.GetBaseInfo(ctx, fuApi, minerId, chainHeight, chainTipSetKey)
+
+	// get miner version
+	minerVersion, err := lotusinfo.GetMinerVersion(ctx, miApi)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// get miner info
+	minerInfo, err := lotusinfo.GetMinerInfo(ctx, fuApi, minerId, chainTipSetKey)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	//Write latest value for each metric in the prometheus metric channel.
 	//Note that you can pass CounterValue, GaugeValue, or UntypedValue types here.
@@ -145,6 +183,17 @@ func (collector *lotusCollector) Collect(ch chan<- prometheus.Metric) {
 		ch <- prometheus.MustNewConstMetric(collector.lotusChainSyncDiff, prometheus.GaugeValue, float64(i.CSDiff), minerId, i.CSWorkerID)
 		ch <- prometheus.MustNewConstMetric(collector.lotusChainSyncStatus, prometheus.GaugeValue, float64(i.CSStatus), minerId, i.CSWorkerID)
 	}
+
+	ch <- prometheus.MustNewConstMetric(collector.lotusPower, prometheus.GaugeValue, float64(mpRaw), minerId, "miner", "RawBytePower")
+	ch <- prometheus.MustNewConstMetric(collector.lotusPower, prometheus.GaugeValue, float64(mpQua), minerId, "miner", "QualityAdjPower")
+	ch <- prometheus.MustNewConstMetric(collector.lotusPower, prometheus.GaugeValue, float64(tpRaw), minerId, "network", "RawBytePower")
+	ch <- prometheus.MustNewConstMetric(collector.lotusPower, prometheus.GaugeValue, float64(tpQua), minerId, "network", "QualityAdjPower")
+	ch <- prometheus.MustNewConstMetric(collector.lotusPowerEligibility, prometheus.GaugeValue, float64(powerEligibility), minerId)
+
+	ch <- prometheus.MustNewConstMetric(collector.minerInfo, prometheus.GaugeValue, 1, minerId, minerVersion, minerInfo.Owner, minerInfo.OwnerAddr,
+		minerInfo.WorkerAddr, minerInfo.WorkerAddr, minerInfo.Control0, minerInfo.Control0Addr)
+
+	ch <- prometheus.MustNewConstMetric(collector.minerInfoSectorSize, prometheus.GaugeValue, float64(minerInfo.SectorSize))
 }
 
 // Register registers the volume metrics
