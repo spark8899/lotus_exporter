@@ -193,7 +193,7 @@ func (collector *lotusCollector) Collect(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(collector.minerInfo, prometheus.GaugeValue, 1, minerId, minerVersion, minerInfo.Owner, minerInfo.OwnerAddr,
 		minerInfo.WorkerAddr, minerInfo.WorkerAddr, minerInfo.Control0, minerInfo.Control0Addr)
 
-	ch <- prometheus.MustNewConstMetric(collector.minerInfoSectorSize, prometheus.GaugeValue, float64(minerInfo.SectorSize))
+	ch <- prometheus.MustNewConstMetric(collector.minerInfoSectorSize, prometheus.GaugeValue, float64(minerInfo.SectorSize), minerId)
 }
 
 // Register registers the volume metrics
