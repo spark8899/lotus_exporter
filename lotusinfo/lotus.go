@@ -215,16 +215,21 @@ func GetWalletlist(ctx context.Context, fu lotusapi.FullNodeStruct) (mpoolTotal 
 	return len(walletList)
 }
 
-func GetWalletBalance(ctx context.Context, fu lotusapi.FullNodeStruct, addrStg string) uint64 {
+func GetWalletBalance(ctx context.Context, fu lotusapi.FullNodeStruct, addrStg string) (balance float64) {
 	addr, err := address.NewFromString(addrStg)
 	if err != nil {
-		log.Fatalf("convert miner id err: %s", err)
+		log.Fatalf("convert addr id err: %s", err)
 	}
 
-	addrBlance, err := fu.WalletBalance(ctx, addr)
+	addrBalance, err := fu.WalletBalance(ctx, addr)
 	if err != nil {
-		log.Fatalf("get Blance err: %s", err)
+		log.Fatalf("get blance err: %s", err)
 	}
 
-	return addrBlance.Uint64() / 1000000000000000000
+	balanceFl, err := strconv.ParseFloat(types.FIL(addrBalance).Unitless(), 64)
+	if err != nil {
+		log.Fatalf("convert blance float err: %s", err)
+	}
+
+	return balanceFl
 }
