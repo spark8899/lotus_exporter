@@ -48,13 +48,13 @@ func GetLocalTime() (localTime int64) {
 }
 
 func GetTipsetKey(ctx context.Context, fu lotusapi.FullNodeStruct) (tipSet *types.TipSet, err error) {
-	GetTipsetKey, err := fu.ChainHead(ctx)
+	tipsetKey, err := fu.ChainHead(ctx)
 	if err != nil {
 		log.Fatalf("Get chain head: %s", err)
 		return nil, err
 	}
 
-	return GetTipsetKey, nil
+	return tipsetKey, nil
 }
 
 func GetInfo(ctx context.Context, fu lotusapi.FullNodeStruct, chainHead *types.TipSet) (daemonInfo DaemonInfo, err error) {
