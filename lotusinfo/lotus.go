@@ -137,8 +137,12 @@ func GetBaseInfo(ctx context.Context, fu lotusapi.FullNodeStruct, minerId string
 func GetMpoolTotal(ctx context.Context, fu lotusapi.FullNodeStruct, chainTipSetKey *types.TipSet) (mpoolTotal int) {
 	mpoolPending, err := fu.MpoolPending(ctx, chainTipSetKey.Key())
 	if err != nil {
-		log.Fatalf("convert miner id err: %s", err)
+		log.Fatalf("get mpool pending err: %s", err)
 	}
+
+	//for _, msg := range mpoolPending {
+	//	msg.Message.From
+	//}
 
 	return len(mpoolPending)
 }
@@ -146,8 +150,17 @@ func GetMpoolTotal(ctx context.Context, fu lotusapi.FullNodeStruct, chainTipSetK
 func GetLocalMpool(ctx context.Context, fu lotusapi.FullNodeStruct, chainTipSetKey *types.TipSet) (mpoolTotal int) {
 	mpoolPending, err := fu.MpoolPending(ctx, chainTipSetKey.Key())
 	if err != nil {
-		log.Fatalf("convert miner id err: %s", err)
+		log.Fatalf("get mpool pending err: %s", err)
 	}
 
 	return len(mpoolPending)
+}
+
+func Getwalletlist(ctx context.Context, fu lotusapi.FullNodeStruct) (mpoolTotal int) {
+	walletList, err := fu.WalletList(ctx)
+	if err != nil {
+		log.Fatalf("get mpool pending err: %s", err)
+	}
+
+	return len(walletList)
 }

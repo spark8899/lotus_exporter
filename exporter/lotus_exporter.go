@@ -7,6 +7,7 @@ import (
 	"github.com/spark8899/lotus_exporter/lotusinfo"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -127,6 +128,16 @@ func (collector *lotusCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 	defer closer02()
 
+	// get owner from env
+	ownerID := os.Getenv("OWNER_ID")
+	ownerADDR := os.Getenv("OWNER_ADDR")
+	if ownerID != "" {
+		log.Printf("owner id: %s", ownerID)
+	}
+	if ownerADDR != "" {
+		log.Printf("owner addr: %s", ownerADDR)
+	}
+
 	// get minerId
 	minerId, err := lotusinfo.GetMinerID(ctx, miApi)
 	if err != nil {
@@ -145,6 +156,16 @@ func (collector *lotusCollector) Collect(ch chan<- prometheus.Metric) {
 		log.Fatal(err)
 	}
 
+	// get miner info
+	minerInfo, err := lotusinfo.GetMinerInfo(ctx, fuApi, minerId, chainTipSetKey)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// get local wallet
+	walletList := []string{minerInfo.OwnerAddr, minerInfo.WorkerAddr, minerInfo.Control0Addr}
+	log.Printf("wallet: %s", walletList)
+
 	// get chain sync info
 	chainSyncStats := lotusinfo.GetChainSyncState(ctx, fuApi)
 
@@ -162,12 +183,6 @@ func (collector *lotusCollector) Collect(ch chan<- prometheus.Metric) {
 
 	// get miner version
 	minerVersion, err := lotusinfo.GetMinerVersion(ctx, miApi)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// get miner info
-	minerInfo, err := lotusinfo.GetMinerInfo(ctx, fuApi, minerId, chainTipSetKey)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -191,7 +206,7 @@ func (collector *lotusCollector) Collect(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(collector.lotusPowerEligibility, prometheus.GaugeValue, float64(powerEligibility), minerId)
 
 	ch <- prometheus.MustNewConstMetric(collector.minerInfo, prometheus.GaugeValue, 1, minerId, minerVersion, minerInfo.Owner, minerInfo.OwnerAddr,
-		minerInfo.WorkerAddr, minerInfo.WorkerAddr, minerInfo.Control0, minerInfo.Control0Addr)
+		minerInfo.Worker, minerInfo.WorkerAddr, minerInfo.Control0, minerInfo.Control0Addr)
 
 	ch <- prometheus.MustNewConstMetric(collector.minerInfoSectorSize, prometheus.GaugeValue, float64(minerInfo.SectorSize), minerId)
 }
