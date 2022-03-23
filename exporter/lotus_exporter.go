@@ -26,16 +26,19 @@ type LotusOpt struct {
 
 // setting collector
 type lotusCollector struct {
-	lotusInfo             *prometheus.Desc
-	lotusLocalTime        *prometheus.Desc
-	lotusChainBasefee     *prometheus.Desc
-	lotusChainHeight      *prometheus.Desc
-	lotusChainSyncDiff    *prometheus.Desc
-	lotusChainSyncStatus  *prometheus.Desc
-	lotusPower            *prometheus.Desc
-	lotusPowerEligibility *prometheus.Desc
-	minerInfo             *prometheus.Desc
-	minerInfoSectorSize   *prometheus.Desc
+	lotusInfo              *prometheus.Desc
+	lotusLocalTime         *prometheus.Desc
+	lotusChainBasefee      *prometheus.Desc
+	lotusChainHeight       *prometheus.Desc
+	lotusChainSyncDiff     *prometheus.Desc
+	lotusChainSyncStatus   *prometheus.Desc
+	lotusMpoolTotal        *prometheus.Desc
+	lotusMpoolLocalTotal   *prometheus.Desc
+	lotusMpoolLocalMessage *prometheus.Desc
+	lotusPower             *prometheus.Desc
+	lotusPowerEligibility  *prometheus.Desc
+	minerInfo              *prometheus.Desc
+	minerInfoSectorSize    *prometheus.Desc
 
 	ltOptions LotusOpt
 }
@@ -67,6 +70,19 @@ func newLotusCollector(opts *LotusOpt) *lotusCollector {
 		lotusChainSyncStatus: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "chain_sync_status"),
 			"return daemon sync status with chainhead for each daemon worker",
 			[]string{"miner_id", "worker_id"}, nil,
+		),
+		lotusMpoolTotal: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "mpool_total"),
+			"return number of message pending in mpool",
+			[]string{"miner_id"}, nil,
+		),
+		lotusMpoolLocalTotal: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "mpool_local_total"),
+			"return number of messages pending in local mpool",
+			[]string{"miner_id"}, nil,
+		),
+		lotusMpoolLocalMessage: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "mpool_local_message"),
+			"local message details",
+			[]string{"miner_id", "msg_from", "msg_to", "msg_nonce", "msg_value", "msg_gaslimit", "msg_gasfeecap", "msg_gaspremium",
+				"msg_method", "msg_method_type", "msg_to_actor_type"}, nil,
 		),
 		lotusPower: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "power"),
 			"return miner power",
@@ -129,14 +145,8 @@ func (collector *lotusCollector) Collect(ch chan<- prometheus.Metric) {
 	defer closer02()
 
 	// get owner from env
-	ownerID := os.Getenv("OWNER_ID")
-	ownerADDR := os.Getenv("OWNER_ADDR")
-	if ownerID != "" {
-		log.Printf("owner id: %s", ownerID)
-	}
-	if ownerADDR != "" {
-		log.Printf("owner addr: %s", ownerADDR)
-	}
+	osOwnerID := os.Getenv("OWNER_ID")
+	osOwnerADDR := os.Getenv("OWNER_ADDR")
 
 	// get minerId
 	minerId, err := lotusinfo.GetMinerID(ctx, miApi)
@@ -162,8 +172,22 @@ func (collector *lotusCollector) Collect(ch chan<- prometheus.Metric) {
 		log.Fatal(err)
 	}
 
+	// get owner info
+	var ownerID, ownerADDR string
+	if osOwnerID != "" {
+		ownerID = osOwnerID
+	} else {
+		ownerID = minerInfo.Owner
+	}
+
+	if osOwnerADDR != "" {
+		ownerADDR = osOwnerADDR
+	} else {
+		ownerADDR = minerInfo.OwnerAddr
+	}
+
 	// get local wallet
-	walletList := []string{minerInfo.OwnerAddr, minerInfo.WorkerAddr, minerInfo.Control0Addr}
+	walletList := []string{ownerADDR, minerInfo.WorkerAddr, minerInfo.Control0Addr}
 	log.Printf("wallet: %s", walletList)
 
 	// get chain sync info
@@ -174,6 +198,9 @@ func (collector *lotusCollector) Collect(ch chan<- prometheus.Metric) {
 
 	// get chain basefee
 	basefee := lotusinfo.GetChainBasefee(chainTipSetKey)
+
+	// get mpool total, local msg total, local msg list
+	mpoolTotal, localMpollTotal, msgLst := lotusinfo.GetMpoolInfo(ctx, fuApi, chainTipSetKey, walletList)
 
 	// get miner power
 	mpRaw, mpQua, tpRaw, tpQua := lotusinfo.GetPowerList(ctx, fuApi, minerId, chainTipSetKey)
@@ -199,13 +226,21 @@ func (collector *lotusCollector) Collect(ch chan<- prometheus.Metric) {
 		ch <- prometheus.MustNewConstMetric(collector.lotusChainSyncStatus, prometheus.GaugeValue, float64(i.CSStatus), minerId, i.CSWorkerID)
 	}
 
+	ch <- prometheus.MustNewConstMetric(collector.lotusMpoolTotal, prometheus.GaugeValue, float64(mpoolTotal), minerId)
+	ch <- prometheus.MustNewConstMetric(collector.lotusMpoolLocalTotal, prometheus.GaugeValue, float64(localMpollTotal), minerId)
+	for _, mmsg := range msgLst {
+		ch <- prometheus.MustNewConstMetric(collector.lotusMpoolLocalMessage, prometheus.GaugeValue, 1, minerId,
+			mmsg.Mfrom, mmsg.Mto, string(mmsg.Mnonce), string(mmsg.Mvalue), string(mmsg.Mgaslimit), string(mmsg.Mgasfeecap),
+			string(mmsg.Mgaspremium), string(mmsg.Mmethod), mmsg.Mmethodtype, mmsg.Mactortype)
+	}
+
 	ch <- prometheus.MustNewConstMetric(collector.lotusPower, prometheus.GaugeValue, float64(mpRaw), minerId, "miner", "RawBytePower")
 	ch <- prometheus.MustNewConstMetric(collector.lotusPower, prometheus.GaugeValue, float64(mpQua), minerId, "miner", "QualityAdjPower")
 	ch <- prometheus.MustNewConstMetric(collector.lotusPower, prometheus.GaugeValue, float64(tpRaw), minerId, "network", "RawBytePower")
 	ch <- prometheus.MustNewConstMetric(collector.lotusPower, prometheus.GaugeValue, float64(tpQua), minerId, "network", "QualityAdjPower")
 	ch <- prometheus.MustNewConstMetric(collector.lotusPowerEligibility, prometheus.GaugeValue, float64(powerEligibility), minerId)
 
-	ch <- prometheus.MustNewConstMetric(collector.minerInfo, prometheus.GaugeValue, 1, minerId, minerVersion, minerInfo.Owner, minerInfo.OwnerAddr,
+	ch <- prometheus.MustNewConstMetric(collector.minerInfo, prometheus.GaugeValue, 1, minerId, minerVersion, ownerID, ownerADDR,
 		minerInfo.Worker, minerInfo.WorkerAddr, minerInfo.Control0, minerInfo.Control0Addr)
 
 	ch <- prometheus.MustNewConstMetric(collector.minerInfoSectorSize, prometheus.GaugeValue, float64(minerInfo.SectorSize), minerId)
