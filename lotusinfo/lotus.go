@@ -37,6 +37,12 @@ type MpoolMsg struct {
 	Mactortype  string
 }
 
+type WalletInfo struct {
+	Name    string
+	Address string
+	Balance uint64
+}
+
 func GetLocalTime() (localTime int64) {
 	return time.Now().Unix()
 }
@@ -200,11 +206,25 @@ func GetMpoolInfo(ctx context.Context, fu lotusapi.FullNodeStruct, chainTipSetKe
 	return len(mpoolPending), len(msgList), msgList
 }
 
-func Getwalletlist(ctx context.Context, fu lotusapi.FullNodeStruct) (mpoolTotal int) {
+func GetWalletlist(ctx context.Context, fu lotusapi.FullNodeStruct) (mpoolTotal int) {
 	walletList, err := fu.WalletList(ctx)
 	if err != nil {
 		log.Fatalf("get wallet list err: %s", err)
 	}
 
 	return len(walletList)
+}
+
+func GetWalletBalance(ctx context.Context, fu lotusapi.FullNodeStruct, addrStg string) uint64 {
+	addr, err := address.NewFromString(addrStg)
+	if err != nil {
+		log.Fatalf("convert miner id err: %s", err)
+	}
+
+	addrBlance, err := fu.WalletBalance(ctx, addr)
+	if err != nil {
+		log.Fatalf("get Blance err: %s", err)
+	}
+
+	return addrBlance.Uint64() / 1000000000000000000
 }

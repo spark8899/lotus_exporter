@@ -37,6 +37,7 @@ type lotusCollector struct {
 	lotusMpoolLocalMessage *prometheus.Desc
 	lotusPower             *prometheus.Desc
 	lotusPowerEligibility  *prometheus.Desc
+	lotusWalletBalance     *prometheus.Desc
 	minerInfo              *prometheus.Desc
 	minerInfoSectorSize    *prometheus.Desc
 
@@ -91,6 +92,10 @@ func newLotusCollector(opts *LotusOpt) *lotusCollector {
 		lotusPowerEligibility: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "power_mining_eligibility"),
 			"return miner mining eligibility",
 			[]string{"miner_id"}, nil,
+		),
+		lotusWalletBalance: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "wallet_balance"),
+			"return wallet balance",
+			[]string{"miner_id", "address", "name"}, nil,
 		),
 		minerInfo: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "miner_info"),
 			"lotus miner information like address version etc",
@@ -188,7 +193,6 @@ func (collector *lotusCollector) Collect(ch chan<- prometheus.Metric) {
 
 	// get local wallet
 	walletList := []string{ownerADDR, minerInfo.WorkerAddr, minerInfo.Control0Addr}
-	log.Printf("wallet: %s", walletList)
 
 	// get chain sync info
 	chainSyncStats := lotusinfo.GetChainSyncState(ctx, fuApi)
@@ -239,6 +243,10 @@ func (collector *lotusCollector) Collect(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(collector.lotusPower, prometheus.GaugeValue, float64(tpRaw), minerId, "network", "RawBytePower")
 	ch <- prometheus.MustNewConstMetric(collector.lotusPower, prometheus.GaugeValue, float64(tpQua), minerId, "network", "QualityAdjPower")
 	ch <- prometheus.MustNewConstMetric(collector.lotusPowerEligibility, prometheus.GaugeValue, float64(powerEligibility), minerId)
+
+	ch <- prometheus.MustNewConstMetric(collector.lotusWalletBalance, prometheus.GaugeValue, float64(lotusinfo.GetWalletBalance(ctx, fuApi, ownerADDR)), minerId, ownerID, ownerADDR)
+	ch <- prometheus.MustNewConstMetric(collector.lotusWalletBalance, prometheus.GaugeValue, float64(lotusinfo.GetWalletBalance(ctx, fuApi, minerInfo.WorkerAddr)), minerId, minerInfo.Worker, minerInfo.WorkerAddr)
+	ch <- prometheus.MustNewConstMetric(collector.lotusWalletBalance, prometheus.GaugeValue, float64(lotusinfo.GetWalletBalance(ctx, fuApi, minerInfo.Control0Addr)), minerId, minerInfo.Control0, minerInfo.Control0Addr)
 
 	ch <- prometheus.MustNewConstMetric(collector.minerInfo, prometheus.GaugeValue, 1, minerId, minerVersion, ownerID, ownerADDR,
 		minerInfo.Worker, minerInfo.WorkerAddr, minerInfo.Control0, minerInfo.Control0Addr)
