@@ -41,6 +41,16 @@ type lotusCollector struct {
 	lotusWalletLockedBalance *prometheus.Desc
 	minerInfo                *prometheus.Desc
 	minerInfoSectorSize      *prometheus.Desc
+	minerWorkerCpu           *prometheus.Desc
+	minerWorkerGpu           *prometheus.Desc
+	minerWorkerRamTotal      *prometheus.Desc
+	minerWorkerRamReserved   *prometheus.Desc
+	minerWorkerRamTasks      *prometheus.Desc
+	minerWorkerVmemTotal     *prometheus.Desc
+	minerWorkerVmemReserved  *prometheus.Desc
+	minerWorkerVmemTasks     *prometheus.Desc
+	minerWorkerCpuUsed       *prometheus.Desc
+	minerWorkerGpuUsed       *prometheus.Desc
 
 	ltOptions LotusOpt
 }
@@ -109,6 +119,46 @@ func newLotusCollector(opts *LotusOpt) *lotusCollector {
 		minerInfoSectorSize: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "miner_info_sector_size"),
 			"lotus miner sector size",
 			[]string{"miner_id"}, nil,
+		),
+		minerWorkerCpu: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "miner_worker_cpu"),
+			"number of CPU used by lotus",
+			[]string{"miner_id", "worker_host"}, nil,
+		),
+		minerWorkerGpu: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "miner_worker_gpu"),
+			"is the GPU used by lotus",
+			[]string{"miner_id", "worker_host"}, nil,
+		),
+		minerWorkerRamTotal: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "miner_worker_ram_total"),
+			"worker server RAM",
+			[]string{"miner_id", "worker_host"}, nil,
+		),
+		minerWorkerRamReserved: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "miner_worker_ram_reserved"),
+			"worker memory reserved by lotus",
+			[]string{"miner_id", "worker_host"}, nil,
+		),
+		minerWorkerRamTasks: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "miner_worker_ram_tasks"),
+			"worker minimal memory used",
+			[]string{"miner_id", "worker_host"}, nil,
+		),
+		minerWorkerVmemTotal: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "miner_worker_vmem_total"),
+			"server Physical RAM + Swap",
+			[]string{"miner_id", "worker_host"}, nil,
+		),
+		minerWorkerVmemReserved: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "miner_worker_vmem_reserved"),
+			"worker VMEM used by on-going tasks",
+			[]string{"miner_id", "worker_host"}, nil,
+		),
+		minerWorkerVmemTasks: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "miner_worker_vmem_tasks"),
+			"worker VMEM reserved by lotus",
+			[]string{"miner_id", "worker_host"}, nil,
+		),
+		minerWorkerCpuUsed: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "miner_worker_cpu_used"),
+			"number of CPU used by lotused by lotus",
+			[]string{"miner_id", "worker_host"}, nil,
+		),
+		minerWorkerGpuUsed: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "miner_worker_gpu_used"),
+			"is the GPU used by lotus",
+			[]string{"miner_id", "worker_host"}, nil,
 		),
 
 		ltOptions: *opts,
@@ -226,6 +276,9 @@ func (collector *lotusCollector) Collect(ch chan<- prometheus.Metric) {
 		log.Fatal(err)
 	}
 
+	// get worker info
+	workerGroupInfo := lotusinfo.GetWorkerInfo(ctx, miApi)
+
 	//Write latest value for each metric in the prometheus metric channel.
 	//Note that you can pass CounterValue, GaugeValue, or UntypedValue types here.
 	ch <- prometheus.MustNewConstMetric(collector.lotusLocalTime, prometheus.GaugeValue, float64(lotusinfo.GetLocalTime()))
@@ -265,6 +318,19 @@ func (collector *lotusCollector) Collect(ch chan<- prometheus.Metric) {
 		minerInfo.Worker, minerInfo.WorkerAddr, minerInfo.Control0, minerInfo.Control0Addr)
 
 	ch <- prometheus.MustNewConstMetric(collector.minerInfoSectorSize, prometheus.GaugeValue, float64(minerInfo.SectorSize), minerId)
+
+	for _, worker0 := range workerGroupInfo {
+		ch <- prometheus.MustNewConstMetric(collector.minerWorkerCpu, prometheus.GaugeValue, float64(worker0.WCpu), minerId, worker0.WHost)
+		ch <- prometheus.MustNewConstMetric(collector.minerWorkerGpu, prometheus.GaugeValue, float64(worker0.WGpu), minerId, worker0.WHost)
+		ch <- prometheus.MustNewConstMetric(collector.minerWorkerRamTotal, prometheus.GaugeValue, float64(worker0.WRamTotal), minerId, worker0.WHost)
+		ch <- prometheus.MustNewConstMetric(collector.minerWorkerRamReserved, prometheus.GaugeValue, float64(worker0.WRamReserved), minerId, worker0.WHost)
+		ch <- prometheus.MustNewConstMetric(collector.minerWorkerRamTasks, prometheus.GaugeValue, float64(worker0.WRamTasks), minerId, worker0.WHost)
+		ch <- prometheus.MustNewConstMetric(collector.minerWorkerVmemTotal, prometheus.GaugeValue, float64(worker0.WVmemTotal), minerId, worker0.WHost)
+		ch <- prometheus.MustNewConstMetric(collector.minerWorkerVmemReserved, prometheus.GaugeValue, float64(worker0.WVmemReseved), minerId, worker0.WHost)
+		ch <- prometheus.MustNewConstMetric(collector.minerWorkerVmemTasks, prometheus.GaugeValue, float64(worker0.WvmemTasks), minerId, worker0.WHost)
+		ch <- prometheus.MustNewConstMetric(collector.minerWorkerCpuUsed, prometheus.GaugeValue, float64(worker0.WCpuUsed), minerId, worker0.WHost)
+		ch <- prometheus.MustNewConstMetric(collector.minerWorkerGpuUsed, prometheus.GaugeValue, float64(worker0.WGpuUsed), minerId, worker0.WHost)
+	}
 }
 
 // Register registers the volume metrics

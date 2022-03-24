@@ -25,13 +25,27 @@ type LockedInfo struct {
 	Balance    float64
 }
 
+type WorkerInfo struct {
+	WHost        string
+	WCpu         uint64
+	WGpu         int
+	WRamTotal    uint64
+	WRamReserved int
+	WRamTasks    uint64
+	WVmemTotal   uint64
+	WVmemReseved int
+	WvmemTasks   uint64
+	WCpuUsed     uint64
+	WGpuUsed     int
+}
+
 func GetMinerID(ctx context.Context, mi lotusapi.StorageMinerStruct) (id string, err error) {
 	minerId, err := mi.ActorAddress(ctx)
 	if err != nil {
 		log.Fatalf("get actor address: %s", err)
 		return "", err
 	}
-	// fmt.Printf("miner actor address: %s\n", address.String())
+
 	return minerId.String(), nil
 }
 
@@ -41,7 +55,7 @@ func GetMinerVersion(ctx context.Context, mi lotusapi.StorageMinerStruct) (miVer
 		log.Fatalf("get actor version: %s", err)
 		return "", err
 	}
-	// fmt.Printf("miner actor address: %s\n", address.String())
+
 	return miVersion.String(), nil
 }
 
@@ -85,7 +99,6 @@ func GetMinerInfo(ctx context.Context, fu lotusapi.FullNodeStruct, minerId strin
 		return MinerInfo{}, err
 	}
 
-	// fmt.Printf("miner actor address: %s\n", address.String())
 	return MinerInfo{
 		Owner:        owner.String(),
 		OwnerAddr:    ownerAddr.String(),
@@ -147,57 +160,57 @@ func GetLockedFunds(ctx context.Context, fu lotusapi.FullNodeStruct, minerId str
 	return lockedInfoG
 }
 
-func Strval(value interface{}) string {
-	var key string
-	if value == nil {
-		return key
+func GetWorkerInfo(ctx context.Context, mi lotusapi.StorageMinerStruct) (workers []WorkerInfo) {
+	workerStats, err := mi.WorkerStats(ctx)
+	if err != nil {
+		log.Fatalf("get actor address: %s", err)
+		// return "", err
 	}
 
-	switch value.(type) {
-	case float64:
-		ft := value.(float64)
-		key = strconv.FormatFloat(ft, 'f', -1, 64)
-	case float32:
-		ft := value.(float32)
-		key = strconv.FormatFloat(float64(ft), 'f', -1, 64)
-	case int:
-		it := value.(int)
-		key = strconv.Itoa(it)
-	case uint:
-		it := value.(uint)
-		key = strconv.Itoa(int(it))
-	case int8:
-		it := value.(int8)
-		key = strconv.Itoa(int(it))
-	case uint8:
-		it := value.(uint8)
-		key = strconv.Itoa(int(it))
-	case int16:
-		it := value.(int16)
-		key = strconv.Itoa(int(it))
-	case uint16:
-		it := value.(uint16)
-		key = strconv.Itoa(int(it))
-	case int32:
-		it := value.(int32)
-		key = strconv.Itoa(int(it))
-	case uint32:
-		it := value.(uint32)
-		key = strconv.Itoa(int(it))
-	case int64:
-		it := value.(int64)
-		key = strconv.FormatInt(it, 10)
-	case uint64:
-		it := value.(uint64)
-		key = strconv.FormatUint(it, 10)
-	case string:
-		key = value.(string)
-	case []byte:
-		key = string(value.([]byte))
-	default:
-		newValue, _ := json.Marshal(value)
-		key = string(newValue)
+	var WorkerGroups []WorkerInfo
+	for _, worker := range workerStats {
+		workerHost := worker.Info.Hostname
+		cpus := worker.Info.Resources.CPUs
+		gpus := len(worker.Info.Resources.GPUs)
+
+		ramTotal := worker.Info.Resources.MemPhysical
+		ramTasks := worker.MemUsedMin
+		ramUsed := worker.Info.Resources.MemUsed
+		ramReserved := 0
+		if ramUsed > ramTasks {
+			ramReserved = int(ramUsed) - int(ramTasks)
+		}
+
+		vmemTotal := ramTotal + worker.Info.Resources.MemSwap
+		vmemTasks := worker.MemUsedMax
+		vmemUsed := ramUsed + worker.Info.Resources.MemSwapUsed
+		vmemReserved := 0
+		if vmemUsed > vmemTasks {
+			vmemReserved = int(vmemUsed) - int(vmemTasks)
+		}
+
+		var gpuUsed int
+		if worker.GpuUsed > 0 {
+			gpuUsed = 1
+		} else {
+			gpuUsed = 0
+		}
+		cpuUsed := worker.CpuUse
+
+		WorkerGroups = append(WorkerGroups, WorkerInfo{
+			workerHost,
+			cpus,
+			gpus,
+			ramTotal,
+			ramReserved,
+			ramTasks,
+			vmemTotal,
+			vmemReserved,
+			vmemTasks,
+			cpuUsed,
+			gpuUsed,
+		})
 	}
 
-	return key
+	return WorkerGroups
 }
