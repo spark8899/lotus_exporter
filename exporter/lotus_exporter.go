@@ -26,20 +26,21 @@ type LotusOpt struct {
 
 // setting collector
 type lotusCollector struct {
-	lotusInfo              *prometheus.Desc
-	lotusLocalTime         *prometheus.Desc
-	lotusChainBasefee      *prometheus.Desc
-	lotusChainHeight       *prometheus.Desc
-	lotusChainSyncDiff     *prometheus.Desc
-	lotusChainSyncStatus   *prometheus.Desc
-	lotusMpoolTotal        *prometheus.Desc
-	lotusMpoolLocalTotal   *prometheus.Desc
-	lotusMpoolLocalMessage *prometheus.Desc
-	lotusPower             *prometheus.Desc
-	lotusPowerEligibility  *prometheus.Desc
-	lotusWalletBalance     *prometheus.Desc
-	minerInfo              *prometheus.Desc
-	minerInfoSectorSize    *prometheus.Desc
+	lotusInfo                *prometheus.Desc
+	lotusLocalTime           *prometheus.Desc
+	lotusChainBasefee        *prometheus.Desc
+	lotusChainHeight         *prometheus.Desc
+	lotusChainSyncDiff       *prometheus.Desc
+	lotusChainSyncStatus     *prometheus.Desc
+	lotusMpoolTotal          *prometheus.Desc
+	lotusMpoolLocalTotal     *prometheus.Desc
+	lotusMpoolLocalMessage   *prometheus.Desc
+	lotusPower               *prometheus.Desc
+	lotusPowerEligibility    *prometheus.Desc
+	lotusWalletBalance       *prometheus.Desc
+	lotusWalletLockedBalance *prometheus.Desc
+	minerInfo                *prometheus.Desc
+	minerInfoSectorSize      *prometheus.Desc
 
 	ltOptions LotusOpt
 }
@@ -96,6 +97,10 @@ func newLotusCollector(opts *LotusOpt) *lotusCollector {
 		lotusWalletBalance: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "wallet_balance"),
 			"return wallet balance",
 			[]string{"miner_id", "address", "name"}, nil,
+		),
+		lotusWalletLockedBalance: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "wallet_locked_balance"),
+			"return miner wallet locked funds",
+			[]string{"miner_id", "address", "locked_type"}, nil,
 		),
 		minerInfo: prometheus.NewDesc(prometheus.BuildFQName(namespace, "", "miner_info"),
 			"lotus miner information like address version etc",
@@ -212,6 +217,9 @@ func (collector *lotusCollector) Collect(ch chan<- prometheus.Metric) {
 	// get miner power eligibility
 	powerEligibility := lotusinfo.GetBaseInfo(ctx, fuApi, minerId, chainHeight, chainTipSetKey)
 
+	// get Locked Balance
+	lockedInfoS := lotusinfo.GetLockedFunds(ctx, fuApi, minerId, chainTipSetKey)
+
 	// get miner version
 	minerVersion, err := lotusinfo.GetMinerVersion(ctx, miApi)
 	if err != nil {
@@ -247,6 +255,10 @@ func (collector *lotusCollector) Collect(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(collector.lotusWalletBalance, prometheus.GaugeValue, float64(lotusinfo.GetWalletBalance(ctx, fuApi, ownerADDR)), minerId, ownerID, ownerADDR)
 	ch <- prometheus.MustNewConstMetric(collector.lotusWalletBalance, prometheus.GaugeValue, float64(lotusinfo.GetWalletBalance(ctx, fuApi, minerInfo.WorkerAddr)), minerId, minerInfo.Worker, minerInfo.WorkerAddr)
 	ch <- prometheus.MustNewConstMetric(collector.lotusWalletBalance, prometheus.GaugeValue, float64(lotusinfo.GetWalletBalance(ctx, fuApi, minerInfo.Control0Addr)), minerId, minerInfo.Control0, minerInfo.Control0Addr)
+
+	for _, lockedI := range lockedInfoS {
+		ch <- prometheus.MustNewConstMetric(collector.lotusWalletLockedBalance, prometheus.GaugeValue, float64(lockedI.Balance), minerId, minerId, lockedI.LockedType)
+	}
 
 	ch <- prometheus.MustNewConstMetric(collector.minerInfo, prometheus.GaugeValue, 1, minerId, minerVersion, ownerID, ownerADDR,
 		minerInfo.Worker, minerInfo.WorkerAddr, minerInfo.Control0, minerInfo.Control0Addr)
