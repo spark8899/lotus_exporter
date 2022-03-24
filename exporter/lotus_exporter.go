@@ -252,6 +252,7 @@ func (collector *lotusCollector) Collect(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(collector.lotusPower, prometheus.GaugeValue, float64(tpQua), minerId, "network", "QualityAdjPower")
 	ch <- prometheus.MustNewConstMetric(collector.lotusPowerEligibility, prometheus.GaugeValue, float64(powerEligibility), minerId)
 
+	ch <- prometheus.MustNewConstMetric(collector.lotusWalletBalance, prometheus.GaugeValue, float64(lotusinfo.GetWalletBalance(ctx, fuApi, minerId)), minerId, minerId, minerId)
 	ch <- prometheus.MustNewConstMetric(collector.lotusWalletBalance, prometheus.GaugeValue, float64(lotusinfo.GetWalletBalance(ctx, fuApi, ownerADDR)), minerId, ownerID, ownerADDR)
 	ch <- prometheus.MustNewConstMetric(collector.lotusWalletBalance, prometheus.GaugeValue, float64(lotusinfo.GetWalletBalance(ctx, fuApi, minerInfo.WorkerAddr)), minerId, minerInfo.Worker, minerInfo.WorkerAddr)
 	ch <- prometheus.MustNewConstMetric(collector.lotusWalletBalance, prometheus.GaugeValue, float64(lotusinfo.GetWalletBalance(ctx, fuApi, minerInfo.Control0Addr)), minerId, minerInfo.Control0, minerInfo.Control0Addr)
